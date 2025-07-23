@@ -1,0 +1,6 @@
+{
+  "command": "npm run dev",
+  "serverUrl": "http://levi_shawn.com",
+  "authenticateProxy": false,
+  "commitMode": "commits"
+}

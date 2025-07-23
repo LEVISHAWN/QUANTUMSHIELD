@@ -1,0 +1,47 @@
+{
+  "name": "quantumshield",
+  "version": "1.0.0",
+  "description": "Post-Quantum Cryptography Management System with AI-driven threat detection",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "nodemon backend/server.js",
+    "frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "full-dev": "concurrently \"npm run dev\" \"cd frontend && npm run dev\"",
+    "linux-terminal": "node backend/cli/terminal-interface.js",
+    "setup-db": "node backend/utils/database-setup.js",
+    "test": "echo \"QuantumShield Test Suite\" && exit 0"
+  },
+  "keywords": [
+    "quantum",
+    "cryptography",
+    "ai",
+    "security",
+    "post-quantum"
+  ],
+  "author": "QuantumShield Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.6.5",
+    "node-cron": "^3.0.3",
+    "rate-limiter-flexible": "^2.4.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
