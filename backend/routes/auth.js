@@ -23,6 +23,7 @@ router.post('/register', async (req, res) => {
 
     // Input validation
     if (!username || !email || !password) {
+      console.error('Registration validation failed: missing username, email, or password', { username, email });
       return res.status(400).json({
         error: 'Username, email, and password are required',
         quantumShieldStatus: 'validation_failed'
@@ -31,6 +32,7 @@ router.post('/register', async (req, res) => {
 
     // Password strength validation (minimum requirements for quantum security)
     if (password.length < 12) {
+      console.error('Registration validation failed: password too short');
       return res.status(400).json({
         error: 'Password must be at least 12 characters for quantum-level security',
         quantumShieldStatus: 'password_weak'
@@ -38,12 +40,19 @@ router.post('/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await executeQuery(
-      'SELECT id FROM users WHERE email = ? OR username = ?',
-      [email, username]
-    );
+    let existingUser;
+    try {
+      existingUser = await executeQuery(
+        'SELECT id FROM users WHERE email = ? OR username = ?',
+        [email, username]
+      );
+    } catch (dbErr) {
+      console.error('Database error during user existence check:', dbErr);
+      throw dbErr;
+    }
 
     if (existingUser.length > 0) {
+      console.error('Registration failed: user already exists', { username, email });
       return res.status(409).json({
         error: 'User with this email or username already exists',
         quantumShieldStatus: 'user_exists'
@@ -51,8 +60,13 @@ router.post('/register', async (req, res) => {
     }
 
     // Hash password with high salt rounds for security
-    const saltRounds = 14; // Higher than default for quantum-era security
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    let passwordHash;
+    try {
+      passwordHash = await bcrypt.hash(password, 14);
+    } catch (hashErr) {
+      console.error('Error hashing password:', hashErr);
+      throw hashErr;
+    }
 
     // Generate unique user ID
     const userId = uuidv4();
@@ -65,32 +79,47 @@ router.post('/register', async (req, res) => {
     }[role] || 1;
 
     // Insert new user into database
-    await executeQuery(`
-      INSERT INTO users 
-      (id, username, email, password_hash, role, quantum_clearance_level) 
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [userId, username, email, passwordHash, role, quantumClearanceLevel]);
+    try {
+      await executeQuery(`
+        INSERT INTO users 
+        (id, username, email, password_hash, role, quantum_clearance_level) 
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [userId, username, email, passwordHash, role, quantumClearanceLevel]);
+    } catch (insertErr) {
+      console.error('Database error during user insert:', insertErr);
+      throw insertErr;
+    }
 
     // Log registration activity
-    await logActivity(userId, 'user_registration', 'users', userId, {
-      username,
-      email,
-      role,
-      quantumClearanceLevel
-    }, req.ip, req.get('User-Agent'));
+    try {
+      await logActivity(userId, 'user_registration', 'users', userId, {
+        username,
+        email,
+        role,
+        quantumClearanceLevel
+      }, req.ip, req.get('User-Agent'));
+    } catch (logErr) {
+      console.error('Error logging registration activity:', logErr);
+    }
 
     // Generate JWT token for immediate login
-    const token = jwt.sign(
-      { 
-        userId, 
-        username, 
-        email, 
-        role, 
-        quantumClearanceLevel 
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    let token;
+    try {
+      token = jwt.sign(
+        { 
+          userId, 
+          username, 
+          email, 
+          role, 
+          quantumClearanceLevel 
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+    } catch (jwtErr) {
+      console.error('Error generating JWT token:', jwtErr);
+      throw jwtErr;
+    }
 
     res.status(201).json({
       message: 'User registered successfully with quantum security clearance',
@@ -131,12 +160,19 @@ router.post('/login', async (req, res) => {
     }
 
     // Find user by email
-    const users = await executeQuery(
-      'SELECT * FROM users WHERE email = ? AND is_active = true',
-      [email]
-    );
+    let users;
+    try {
+      users = await executeQuery(
+        'SELECT * FROM users WHERE email = ? AND is_active = true',
+        [email]
+      );
+    } catch (dbErr) {
+      console.error('Database error during user lookup (login):', dbErr);
+      throw dbErr;
+    }
 
     if (users.length === 0) {
+      console.error('Login failed: user not found or inactive', { email });
       return res.status(401).json({
         error: 'Invalid credentials',
         quantumShieldStatus: 'auth_failed'
@@ -146,15 +182,26 @@ router.post('/login', async (req, res) => {
     const user = users[0];
 
     // Verify password
-    const passwordValid = await bcrypt.compare(password, user.password_hash);
+    let passwordValid;
+    try {
+      passwordValid = await bcrypt.compare(password, user.password_hash);
+    } catch (compareErr) {
+      console.error('Error comparing password during login:', compareErr);
+      throw compareErr;
+    }
     
     if (!passwordValid) {
       // Log failed login attempt
-      await logActivity(null, 'login_failed', 'users', user.id, {
-        email,
-        reason: 'invalid_password'
-      }, req.ip, req.get('User-Agent'));
+      try {
+        await logActivity(null, 'login_failed', 'users', user.id, {
+          email,
+          reason: 'invalid_password'
+        }, req.ip, req.get('User-Agent'));
+      } catch (logErr) {
+        console.error('Error logging failed login attempt:', logErr);
+      }
 
+      console.error('Login failed: invalid password', { email });
       return res.status(401).json({
         error: 'Invalid credentials',
         quantumShieldStatus: 'auth_failed'
@@ -162,29 +209,43 @@ router.post('/login', async (req, res) => {
     }
 
     // Update last login timestamp
-    await executeQuery(
-      'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
-      [user.id]
-    );
+    try {
+      await executeQuery(
+        'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
+    } catch (updateErr) {
+      console.error('Database error updating last_login during login:', updateErr);
+    }
 
     // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        quantumClearanceLevel: user.quantum_clearance_level
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+    let token;
+    try {
+      token = jwt.sign(
+        {
+          userId: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          quantumClearanceLevel: user.quantum_clearance_level
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+    } catch (jwtErr) {
+      console.error('Error generating JWT token during login:', jwtErr);
+      throw jwtErr;
+    }
 
     // Log successful login
-    await logActivity(user.id, 'user_login', 'users', user.id, {
-      email,
-      username: user.username
-    }, req.ip, req.get('User-Agent'));
+    try {
+      await logActivity(user.id, 'user_login', 'users', user.id, {
+        email,
+        username: user.username
+      }, req.ip, req.get('User-Agent'));
+    } catch (logErr) {
+      console.error('Error logging successful login:', logErr);
+    }
 
     res.json({
       message: 'Login successful - Quantum Shield activated',
